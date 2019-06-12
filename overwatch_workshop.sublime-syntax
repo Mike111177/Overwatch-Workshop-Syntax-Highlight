@@ -1,0 +1,149 @@
+%YAML 1.2
+---
+name: Overwatch Workshop
+file_extensions: [workshop, owws]
+scope: source.workshop
+
+variables:
+  heros: "Ana|Ashe|Baptiste|Bastion|Brigitte|D\\.Va|Doomfist|Genji|Hanzo|Junkrat|Lúcio|McCree|Mei|Mercy|Moira|Orisa|Pharah|Reaper|Reinhardt|Roadhog|Soldier\\: 76|Sombra|Symmetra|Torbjörn|Tracer|Widowmaker|Winston|Wrecking Ball|Zarya|Zenyatta"
+  status_effects: Hacked|Knocked Down|Asleep|Frozen|Stunned|Invincible|Unkillable
+  
+contexts:
+  main:
+    - match: rule
+      scope: storage.type.class
+    - match: \(
+      push:
+      - match: '"'
+        push:
+        - meta_scope: entity.name.class
+        - match: '"'
+          pop: true
+      - match: \)
+        pop: true
+    - include: rule
+    - include: disabled_rule
+
+  disabled_rule:
+    - match: disabled\W
+      scope: comment.block
+      push:
+        - meta_scope: comment.block
+        - match: \{
+          set:
+            - meta_scope: comment.block
+            - include: bracket
+
+  disabled_line:
+    - match: disabled\W
+      push:
+      - meta_scope: comment.line
+      - match: \;
+        pop: true
+
+  rule:
+    - match: \b(event|conditions|actions)\b
+      scope: keyword
+      push:
+      - match: \{
+        set:
+          - include: disabled_line
+          - include: language
+          - include: bracket
+
+  string:
+    - match: '"'
+      push:
+      - meta_scope: string.quoted.double.c
+      - match: \{\d\}
+        scope: constant.character.escape.c
+      - match: '"'
+        pop: true
+
+  constants: 
+    - match: \d\.?|\.?\d
+      scope: constant.numeric
+    - match: Null|True|False
+      scope: constant.language
+
+  operators:
+    - match: =|\!|>|<
+      scope: keyword.operator
+
+  bracket:
+    - meta_scope: in_brackets
+    - match: \}
+      pop: true
+    - match: \{
+      push: bracket
+
+  language:
+    - include: string
+    - include: constants
+    - include: operators
+    - match: "{{heros}}"
+      scope: constant.language
+    - match: "([A-Z])(?=[^A-Za-z])|Event Player|Is Assembling Heroes|Is In Setup"
+      scope: variable.language
+    - include: function
+
+  # Function Multiplexer
+  function:
+    # Loop Functions
+    - match: Loop If Condition Is (?:True|False)
+      scope: variable.function
+    # Wait Function
+    - match: Wait(?=\()
+      scope: variable.function
+      push: wait_function
+    # Has Status Function
+    - match: Has Status(?=\()
+      scope: variable.function
+      push: has_status_fn
+    # Other Functions
+    - match: ((?:[A-Z][a-z]*\s?)+)(?=\()
+      scope: variable.function
+      push:
+        - include: language 
+        - include: exit_function
+        - include: function_arg
+
+  # Use this to escape function
+  exit_function:
+    - match: \)
+      pop: true
+
+  # Use this to mark stray marks in functions, place after exit_function if last arg
+  function_arg:
+    - match: \;
+      scope: invalid.illegal.semi-colon-in-function
+    - match: \)
+      scope: invalid.illegal.function-not-enough-args
+
+  # Wait function
+  wait_function:
+    - match: \(
+      set:
+        - include: language
+        - include: function_arg
+        - match: ","
+          set: 
+            - match: Abort When False|Restart When True|Ignore Condition
+              scope: constant.language
+            - include: exit_function
+            - include: function_arg
+
+  # Has Status Function
+  has_status_fn:
+    - match: \(
+      set:
+        - include: language
+        - include: function_arg
+        - match: ","
+          set: 
+            - match: "{{status_effects}}"
+              scope: constant.language
+            - include: exit_function
+            - include: function_arg
+
+
