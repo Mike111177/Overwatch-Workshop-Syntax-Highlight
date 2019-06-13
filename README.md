@@ -1,5 +1,5 @@
 ## Overwatch Workshop Syntax Highlight
-Adds syntax highlighting to code pasted from the Overwatch Workshop
+Adds syntax highlighting to code pasted from the Overwatch Workshop in sublime text
 
 ![Screenshot](https://i.imgur.com/CUs07tI.png)
 
