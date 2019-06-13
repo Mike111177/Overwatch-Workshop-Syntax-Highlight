@@ -8,6 +8,8 @@ variables:
   heros: "Ana|Ashe|Baptiste|Bastion|Brigitte|D\\.Va|Doomfist|Genji|Hanzo|Junkrat|Lúcio|McCree|Mei|Mercy|Moira|Orisa|Pharah|Reaper|Reinhardt|Roadhog|Soldier\\: 76|Sombra|Symmetra|Torbjörn|Tracer|Widowmaker|Winston|Wrecking Ball|Zarya|Zenyatta"
   status_effects: Hacked|Knocked Down|Asleep|Frozen|Stunned|Invincible|Unkillable
   events: Ongoing - Global|Ongoing - Each Player|Player Earned Elimination|Player Dealt Final Blow|Player Dealt Damage|Player Took Damage|Player Died
+  modifiers: Add|Subtract|Multiply|Divide|Modulo|Raise To Power|Min|Max|Append To Array|Remove From Array By Value|Remove From Array By Index
+  global_vars: Event Player|Is Assembling Heroes|Is In Setup
 
 contexts:
   main:
@@ -48,7 +50,7 @@ contexts:
         - match: event
           scope: keyword
           push: event
-        - match: \b(conditions|actions)\b
+        - match: conditions
           scope: keyword
           push:
           - match: \{
@@ -56,8 +58,17 @@ contexts:
               - include: disabled_line
               - include: language
               - include: bracket
+        - match: actions
+          scope: keyword
+          push:
+          - match: \{
+            set:
+              - include: disabled_line
+              - include: actions
+              - include: bracket
         - match: \}
           pop: true
+
 
   event:
     - match: \{
@@ -115,67 +126,118 @@ contexts:
     - include: operators
     - match: "{{heros}}"
       scope: constant.language
-    - match: "([A-Z])(?=[^A-Za-z])|Event Player|Is Assembling Heroes|Is In Setup"
-      scope: variable.language
-    - include: function
+    - include: variable_names
+    - include: conditions
 
-  # Function Multiplexer
-  function:
-    # Loop Functions
-    - match: Loop If Condition Is (?:True|False)
-      scope: variable.function
-    # Wait Function
-    - match: Wait(?=\()
-      scope: variable.function
-      push: wait_function
-    # Has Status Function
-    - match: Has Status(?=\()
-      scope: variable.function
-      push: has_status_fn
-    # Other Functions
-    - match: ((?:[A-Z][a-z]*\s?)+)(?=\()
-      scope: variable.function
-      push:
-        - include: language 
-        - include: exit_function
-        - include: function_arg
+  variable_names:
+    - match: "([A-Z])(?=[^A-Za-z])"
+      scope: variable.language
 
   # Use this to escape function
   exit_function:
     - match: \)
       pop: true
 
-  # Use this to mark stray marks in functions, place after exit_function if last arg
+  # Use this to mark stray marks in functions/actions/conditions, place after exit_function if last arg
   function_arg:
     - match: \;
       scope: invalid.illegal.semi-colon-in-function
     - match: \)
       scope: invalid.illegal.function-not-enough-args
+    - match: ","
+      pop: true
 
-  # Wait function
-  wait_function:
+## Actions
+  # Actions multiplexor
+  actions:
+    # Loop Action
+    - match: Loop If Condition Is (?:True|False)
+      scope: variable.function
+    # Modify Global Variable Action
+    - match: Modify Global Variable(?=\()
+      scope: variable.function
+      push: modify_global_variable_action
+    # Modify Player Variable Action
+    - match: Modify Player Variable(?=\()
+      scope: variable.function
+      push: modify_player_variable_action
+    # Wait Action
+    - match: Wait(?=\()
+      scope: variable.function
+      push: wait_action
+    - match: ((?:[A-Z][a-z]*\s?)+)(?=\()
+      scope: variable.function
+      push:
+        - include: language 
+        - include: exit_function
+
+  # Modify Global Variable Action
+  modify_global_variable_action:
     - match: \(
       set:
-        - include: language
-        - include: function_arg
-        - match: ","
-          set: 
-            - match: Abort When False|Restart When True|Ignore Condition
-              scope: constant.language
+          - - include: language
             - include: exit_function
+            - include: function_arg
+          - - match: "{{modifiers}}"
+              scope: keyword.operator
+            - include: function_arg
+          - - include: variable_names
             - include: function_arg
 
-  # Has Status Function
-  has_status_fn:
+  # Modify Player Variable Action
+  modify_player_variable_action:
     - match: \(
       set:
-        - include: language
-        - include: function_arg
-        - match: ","
-          set: 
-            - match: "{{status_effects}}"
-              scope: constant.language
+          - - include: language
             - include: exit_function
             - include: function_arg
+          - - match: "{{modifiers}}"
+              scope: keyword.operator
+            - include: function_arg
+          - - include: variable_names
+            - include: function_arg
+          - - include: language
+            - include: function_arg
+
+  # Wait action
+  wait_action:
+    - match: \(
+      set:
+        - - match: Abort When False|Restart When True|Ignore Condition
+            scope: constant.language
+          - include: exit_function
+          - include: function_arg
+        - - include: language
+          - include: function_arg
+
+
+## Conditions
+  # Conditions Multiplexer
+  conditions:
+    # Has Status Function
+    - match: Has Status(?=\()
+      scope: variable.function
+      push: has_status_condition
+    # Variable conditions
+    - match: "{{global_vars}}"
+      scope: variable.language
+    # Other Functions
+    - match: ((?:[A-Z][a-z]*\s?)+)(?=\()
+      scope: variable.function
+      push:
+        - include: language 
+        - include: exit_function
+
+  # Has Status Condition
+  has_status_condition:
+    - match: \(
+      set:
+        - - match: "{{status_effects}}"
+            scope: constant.language
+          - include: exit_function
+          - include: function_arg
+        - - include: language
+          - include: function_arg
+ 
 
 
