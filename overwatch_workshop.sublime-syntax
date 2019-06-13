@@ -7,7 +7,8 @@ scope: source.workshop
 variables:
   heros: "Ana|Ashe|Baptiste|Bastion|Brigitte|D\\.Va|Doomfist|Genji|Hanzo|Junkrat|Lúcio|McCree|Mei|Mercy|Moira|Orisa|Pharah|Reaper|Reinhardt|Roadhog|Soldier\\: 76|Sombra|Symmetra|Torbjörn|Tracer|Widowmaker|Winston|Wrecking Ball|Zarya|Zenyatta"
   status_effects: Hacked|Knocked Down|Asleep|Frozen|Stunned|Invincible|Unkillable
-  
+  events: Ongoing - Global|Ongoing - Each Player|Player Earned Elimination|Player Dealt Final Blow|Player Dealt Damage|Player Took Damage|Player Died
+
 contexts:
   main:
     - match: rule
@@ -42,14 +43,45 @@ contexts:
         pop: true
 
   rule:
-    - match: \b(event|conditions|actions)\b
-      scope: keyword
+    - match: \{
+      push: 
+        - match: event
+          scope: keyword
+          push: event
+        - match: \b(conditions|actions)\b
+          scope: keyword
+          push:
+          - match: \{
+            set:
+              - include: disabled_line
+              - include: language
+              - include: bracket
+        - match: \}
+          pop: true
+
+  event:
+    - match: \{
       push:
-      - match: \{
-        set:
-          - include: disabled_line
-          - include: language
-          - include: bracket
+        - match: "{{events}}"
+          scope: entity.name.enum
+          set:
+            - - match: All|Slot \d[01]?(?=\D)
+                scope: variable.language
+              - match: "{{heros}}"
+                scope: constant.language
+              - include: exit
+            - - match: All|Team 1|Team 2
+                scope: variable.language
+              - include: exit
+            - exit
+    - match: "[^{\\s]|}"
+      pop: true
+
+  exit: 
+    - match: \;
+      pop: true
+    - match: (?=\})
+      pop: true
 
   string:
     - match: '"'
